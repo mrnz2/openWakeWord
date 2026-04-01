@@ -1,0 +1,32 @@
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local tool/cache directories
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Project artifacts
+outputs*/
+assets/
+*.onnx
+*.tflite
+*.npy
+*.wav
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
