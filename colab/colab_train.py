@@ -1,7 +1,7 @@
 """
 Uruchomienie treningu openWakeWord na Google Colab bez Dockera.
 
-Wymaga: Linux, git, zależności z colab/requirements-colab.txt, pakietów apt (espeak-ng).
+Wymaga: Linux, git, zależności z colab/install_colab_deps.py (train + tflite), pakietów apt (espeak-ng).
 
 Przykład:
   python colab/colab_train.py --project_root /content/WakeWordProject

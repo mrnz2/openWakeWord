@@ -1,0 +1,5 @@
+# Konwersja ONNX → SavedModel/TFLite (po treningu). Osobny plik = mniej konfliktów z torch.
+# Bez onnx-tf (stary stack TF 2.8 z extras openwakeword) — używamy onnx2tf jak w train.py/Dockerze.
+
+tensorflow>=2.16.0,<2.19
+onnx2tf==1.26.3

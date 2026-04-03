@@ -1,0 +1,28 @@
+# Zależności treningu (openWakeWord z klonu Git — NIE instaluj pakietu openwakeword z PyPI:
+# PyPI ciągnie speexdsp_ns / tflite-runtime z kołami tylko dla wybranych wersji Pythona).
+#
+# torch + torchaudio instaluje colab/install_colab_deps.py (osobno, z indeksem CUDA lub PyPI).
+
+numpy==1.26.4
+scipy>=1.3,<2
+tqdm>=4,<5
+requests>=2,<3
+pyyaml>=6,<7
+scikit-learn>=1,<2
+protobuf>=3.20,<5
+
+onnx>=1.14,<1.17
+onnxruntime>=1.16,<2
+
+torchinfo>=1.8,<2
+torchmetrics>=0.11.4,<1
+speechbrain>=0.5.14,<1
+mutagen>=1.46,<2
+audiomentations>=0.30,<1
+torch-audiomentations>=0.11,<1
+acoustics>=0.2.6,<1
+pronouncing>=0.2,<1
+julius
+webrtcvad
+espeak-phonemizer
+piper-phonemize==1.1.0

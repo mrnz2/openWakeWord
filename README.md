@@ -25,11 +25,11 @@ Docelowa fraza treningowa: **"hey lolita"**
 
 - W repozytorium: notebook `colab/WakeWordProject_Colab.ipynb` — wgraj go do Colab (**File → Upload notebook**) albo otwórz z GitHuba.
 - Ustaw `REPO_URL` w notebooku (fork z tym projektem) albo wgraj ZIP do `/content/WakeWordProject` i `USE_GIT_CLONE = False`.
-- Skrypt `colab/colab_train.py` klonuje `openWakeWord` v0.6.0, stosuje ten sam patch co Dockerfile i uruchamia konwersję TFLite lokalnie (`onnx2tf` z pip).
-- **Colab + Python 3.12:** `colab/requirements-colab.txt` używa markerów PEP 508 (`python_version >= "3.12"`) — nowszy `torch` / `tensorflow` niż w Dockerze (3.10); przy błędzie `pip` komórka notebooka wypisze stdout/stderr instalacji.
+- **Instalacja pakietów:** `python colab/install_colab_deps.py` — kolejno: `torch`/`torchaudio` (indeks CUDA 12.4, potem fallback PyPI), `requirements-colab-train.txt`, `requirements-colab-tflite.txt`. **Nie** instalujemy `openwakeword` z PyPI (przy Pythonie 3.12 i extras PyPI często psuje się `speexdsp_ns` / stare `tensorflow` / `onnx_tf`); trening idzie z **klonu** v0.6.0 jak w `colab_train.py`.
+- Skrypt `colab/colab_train.py` klonuje `openWakeWord` v0.6.0, stosuje ten sam patch co Dockerfile i uruchamia konwersję TFLite lokalnie (`onnx2tf`).
 - Profil `training_configs/hey_lolita_colab.yml` jest lżejszy (mniej próbek/kroków) pod limity czasu i RAM w Colab; pełna jakość: skopiuj parametry z `hey_lolita.yml`.
 - Jeśli `colab_train.py` kończy się **exit 2**: zaktualizuj plik `colab/colab_train.py` z repozytorium (poprzednio `yaml.dump` potrafił psuć config dla `openwakeword.train`; jest też wymuszany `PYTHONPATH` na klon w `/content/openwakeword_v060`). Po zmianach w Colab usuń stary klon: `!rm -rf /content/openwakeword_v060` i uruchom ponownie.
-- **Exit 1 w Colab:** często **`!pip` vs `sys.executable`** — pakiety trafiają do innego Pythona niż kernel (np. log pokazuje `/usr/bin/python3` bez `torch`). Notebook używa `python -m pip` dla tego samego interpretera; komórka treningu **wczytuje `colab_train.py` w tym samym procesie co kernel** (bez `subprocess`), żeby uniknąć rozjazdu interpreterów. Zaktualizuj notebook z repo i uruchom komórki od początku po **Runtime → Restart runtime**.
+- **Exit 1 przy `pip install`:** użyj aktualnego `colab/install_colab_deps.py` (nie pojedynczego starego `requirements-colab.txt`). Komórka treningu wczytuje `colab_train.py` w procesie kernela.
 
 ## Wymagania
 
