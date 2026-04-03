@@ -5,7 +5,7 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - Nie instaluje `openwakeword` z PyPI (klon v0.6.0 jest w colab_train.py).
 - Każda linia z requirements = osobne `pip install` — widać winnego pakietu.
 - Przy błędzie: RuntimeError z ETAP + końcówka stderr/stdout pip (w tracebacku na dole komórki).
-- setuptools>=69: pkg_resources + Python 3.12 (inne pakiety).
+- setuptools 69–81: pkg_resources (pronouncing itd.); setuptools>=82 **usuwa** pkg_resources.
 - lightning-utilities>=0.12 przed Trening: torchmetrics nie może zostawiać starej wersji z pkg_resources.
 - jedi>=0.16: razem z pip/wheel — ipython w Colab bez jedi = ostrzeżenie po setuptools.
 - Po PyTorch: odinstalowanie `tensorflow` z Colab (2.19), żeby nie psuł protobuf/tensorboard przed Treningiem.
@@ -125,8 +125,8 @@ def main() -> None:
     # Debian/Colab: /usr/lib/.../pkg_resources odwołuje się do pkgutil.ImpImporter (usunięty w 3.12).
     _pip(
         py,
-        ["--force-reinstall", "setuptools>=69.2.0"],
-        label="setuptools>=69 (pkg_resources + Python 3.12; torchmetrics)",
+        ["--force-reinstall", "setuptools>=69.2.0,<82"],
+        label="setuptools 69–81 (pkg_resources; v82+ go nie dostarcza)",
     )
 
     torch_cmd = [

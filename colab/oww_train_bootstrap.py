@@ -42,7 +42,7 @@ def _ensure_pkg_resources_works() -> None:
         pass
 
     sys.stderr.write(
-        "[oww_train_bootstrap] Instaluję setuptools (pkg_resources dla pronouncing / danych pakietów)...\n"
+        "[oww_train_bootstrap] Instaluję setuptools<82 (pkg_resources; v82+ go usunął)...\n"
     )
     subprocess.check_call(
         [
@@ -52,7 +52,7 @@ def _ensure_pkg_resources_works() -> None:
             "install",
             "-q",
             "--upgrade",
-            "setuptools>=69.2.0",
+            "setuptools>=69.2.0,<82",
         ]
     )
     importlib.invalidate_caches()
