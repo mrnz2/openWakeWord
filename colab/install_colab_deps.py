@@ -4,7 +4,7 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 
 - Nie instaluje `openwakeword` z PyPI (klon v0.6.0 jest w colab_train.py).
 - Każda linia z requirements = osobne `pip install` — widać winnego pakietu.
-- Uruchamiaj z notebooka przez runpy.run_path(..., run_name="__main__"), żeby log był w tej samej komórce.
+- Przy błędzie: RuntimeError z ETAP + końcówka stderr/stdout pip (w tracebacku na dole komórki).
 """
 from __future__ import annotations
 
@@ -19,42 +19,55 @@ def _pip(py: str, args: list[str], *, label: str) -> None:
     print(f"ETAP: {label}", flush=True)
     print("$ " + " ".join(cmd), flush=True)
     print("=" * 72 + "\n", flush=True)
-    r = subprocess.run(cmd)
+
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.stdout:
+        print(r.stdout, end="", flush=True)
+    if r.stderr:
+        print(r.stderr, end="", file=sys.stderr, flush=True)
     if r.returncode != 0:
-        print(
-            f"\n*** BŁĄD: etap „{label}” zakończył się kodem {r.returncode}. ***\n"
-            "Jeśli to kompilacja (webrtcvad): apt musi mieć build-essential i python3-dev.\n",
-            file=sys.stderr,
-            flush=True,
+        tail_e = (r.stderr or "")[-8000:]
+        tail_o = (r.stdout or "")[-4000:]
+        raise RuntimeError(
+            f"Pip zwrócił kod {r.returncode}.\n"
+            f"ETAP: {label}\n"
+            f"Komenda: pip install {' '.join(args)}\n\n"
+            f"--- stderr (koniec, max ~8k znaków) ---\n{tail_e}\n\n"
+            f"--- stdout (koniec, max ~4k znaków) ---\n{tail_o}"
         )
-        raise SystemExit(r.returncode)
 
 
 def _install_one_requirement(py: str, line: str, *, label: str) -> None:
-    """Instalacja jednej linii z requirements; zna obejścia dla problematycznych pakietów."""
     if line.strip().startswith("onnx2tf"):
-        # Metadane onnx2tf wymagają pakietu „tensorflow”; pip doinstalowałby pełny TF obok tensorflow-cpu.
         _pip(py, [line, "--no-deps"], label=label)
         return
 
     if line.strip() == "webrtcvad":
         print("\n" + "=" * 72, flush=True)
-        print(f"ETAP: {label} (próba PyPI, potem źródło z GitHub)", flush=True)
+        print(f"ETAP: {label} (PyPI → GitHub)", flush=True)
         print("=" * 72 + "\n", flush=True)
+        last_err = ""
         for spec, sublabel in (
             (["webrtcvad"], "webrtcvad z PyPI"),
             (
                 ["git+https://github.com/wiseman/py-webrtcvad.git"],
-                "webrtcvad z github.com/wiseman/py-webrtcvad",
+                "webrtcvad z GitHub",
             ),
         ):
             cmd = [py, "-m", "pip", "install", *spec]
             print(f"--- {sublabel} ---\n$ {' '.join(cmd)}\n", flush=True)
-            r = subprocess.run(cmd)
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.stdout:
+                print(r.stdout, end="", flush=True)
+            if r.stderr:
+                print(r.stderr, end="", file=sys.stderr, flush=True)
             if r.returncode == 0:
                 return
-        print("*** webrtcvad: obie próby nie powiodły się. ***", file=sys.stderr, flush=True)
-        raise SystemExit(1)
+            last_err = (r.stderr or "")[-6000:]
+        raise RuntimeError(
+            f"webrtcvad: PyPI i GitHub nie powiodły się.\n"
+            f"ETAP: {label}\n\nOstatni stderr:\n{last_err}"
+        )
 
     _pip(py, [line], label=label)
 
@@ -68,9 +81,7 @@ def _install_requirements_lines(py: str, req_path: Path, *, label_prefix: str) -
             continue
         n += 1
         short = line if len(line) <= 72 else line[:69] + "…"
-        _install_one_requirement(
-            py, line, label=f"{label_prefix} [{n}] {short}"
-        )
+        _install_one_requirement(py, line, label=f"{label_prefix} [{n}] {short}")
 
 
 def main() -> None:
@@ -80,11 +91,9 @@ def main() -> None:
     py = sys.executable
 
     if not train_req.is_file():
-        print(f"Brak pliku: {train_req}", file=sys.stderr)
-        raise SystemExit(2)
+        raise RuntimeError(f"Brak pliku: {train_req}")
     if not tflite_req.is_file():
-        print(f"Brak pliku: {tflite_req}", file=sys.stderr)
-        raise SystemExit(2)
+        raise RuntimeError(f"Brak pliku: {tflite_req}")
 
     _pip(py, ["-U", "pip", "setuptools", "wheel"], label="Narzędzia pip")
 
