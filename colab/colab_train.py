@@ -2,7 +2,7 @@
 Uruchomienie treningu openWakeWord na Google Colab bez Dockera.
 
 Wymaga: Linux, git, zależności z colab/install_colab_deps.py (train + tflite), pakietów apt (espeak-ng).
-Trening openWakeWord w tym samym procesie (jak kernel Colab); torchmetrics>=1.4 — bez pkg_resources / Python 3.12.
+Trening: subprocess + colab/oww_train_bootstrap.py (czyści debianowy site) oraz lightning-utilities>=0.12 (bez pkg_resources).
 
 Przykład:
   python colab/colab_train.py --project_root /content/WakeWordProject
@@ -10,9 +10,9 @@ Przykład:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
-import runpy
 import shutil
 import subprocess
 import sys
@@ -24,10 +24,11 @@ class CommandFailed(RuntimeError):
     """Polecenie podrzędne zwróciło kod != 0; komunikat zawiera koniec jego stdout/stderr."""
 
 OWW_ROOT = Path("/content/openwakeword_v060")
+_BOOTSTRAP = Path(__file__).resolve().parent / "oww_train_bootstrap.py"
 
 
 def _usr_local_dist_packages() -> Path | None:
-    """Katalog site-packages pip na Linux/Colab (torch, torchmetrics z pip przed katalogiem klonu)."""
+    """Katalog site-packages pip na Linux/Colab (PYTHONPATH dla subprocess treningu)."""
     v = f"{sys.version_info.major}.{sys.version_info.minor}"
     p = Path(f"/usr/local/lib/python{v}/dist-packages")
     return p if p.is_dir() else None
@@ -232,37 +233,25 @@ def run_openwakeword_train(
 
     display_cmd = [sys.executable, "-m", "openwakeword.train", *argv_rest]
     print(f"\n$ {' '.join(display_cmd)}\n", flush=True)
+    print(
+        f"(faktycznie: {sys.executable} {_BOOTSTRAP.name} — subprocess + czysty sys.path)\n",
+        flush=True,
+    )
 
-    oww = str(OWW_ROOT.resolve())
-    _lp = _usr_local_dist_packages()
-    lp_s = str(_lp) if _lp else None
-    while oww in sys.path:
-        sys.path.remove(oww)
-    if lp_s:
-        while lp_s in sys.path:
-            sys.path.remove(lp_s)
-        sys.path.insert(0, oww)
-        sys.path.insert(0, lp_s)
-    else:
-        sys.path.insert(0, oww)
+    if not _BOOTSTRAP.is_file():
+        raise FileNotFoundError(f"Brak bootstrapa treningu: {_BOOTSTRAP}")
 
-    run_argv = [str(train_py), *argv_rest]
-    old_argv = sys.argv[:]
-    old_cwd = os.getcwd()
-    try:
-        os.chdir(OWW_ROOT)
-        sys.argv = run_argv
-        runpy.run_path(str(train_py), run_name="__main__")
-    except SystemExit as e:
-        code = e.code
-        if code not in (0, None):
-            raise CommandFailed(
-                f"openwakeword.train zakończył się kodem {code!r}.\n"
-                f"Polecenie (odpowiednik): {' '.join(display_cmd)}"
-            ) from e
-    finally:
-        sys.argv = old_argv
-        os.chdir(old_cwd)
+    train_env: dict[str, str] = {
+        "OWW_ROOT": str(OWW_ROOT.resolve()),
+        "OWW_TRAIN_ARGV_JSON": json.dumps(argv_rest),
+        "PYTHONUNBUFFERED": "1",
+    }
+    lp = _usr_local_dist_packages()
+    if lp:
+        prev = os.environ.get("PYTHONPATH", "")
+        train_env["PYTHONPATH"] = str(lp) + (os.pathsep + prev if prev else "")
+
+    run([sys.executable, str(_BOOTSTRAP)], cwd=OWW_ROOT, env=train_env)
 
 
 def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) -> None:

@@ -17,8 +17,9 @@ onnx>=1.14,<1.17
 onnxruntime>=1.16,<2
 
 torchinfo>=1.8,<2
-# >=1.4: bez pkg_resources w imports (Python 3.12 + Debian /usr/lib — ImpImporter). openWakeWord v0.6.0: Recall(..., task='binary') OK.
+# torchmetrics 1.4 + lightning-utilities>=0.12: importlib.metadata zamiast pkg_resources (Python 3.12 / Colab).
 torchmetrics>=1.4.0,<2
+lightning-utilities>=0.12.0
 speechbrain>=0.5.14,<1
 mutagen>=1.46,<2
 audiomentations>=0.30,<1

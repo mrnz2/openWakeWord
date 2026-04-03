@@ -5,7 +5,8 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - Nie instaluje `openwakeword` z PyPI (klon v0.6.0 jest w colab_train.py).
 - Każda linia z requirements = osobne `pip install` — widać winnego pakietu.
 - Przy błędzie: RuntimeError z ETAP + końcówka stderr/stdout pip (w tracebacku na dole komórki).
-- setuptools>=69: pkg_resources + Python 3.12 (torchmetrics).
+- setuptools>=69: pkg_resources + Python 3.12 (inne pakiety).
+- lightning-utilities>=0.12 przed Trening: torchmetrics nie może zostawiać starej wersji z pkg_resources.
 - jedi>=0.16: razem z pip/wheel — ipython w Colab bez jedi = ostrzeżenie po setuptools.
 - Po PyTorch: odinstalowanie `tensorflow` z Colab (2.19), żeby nie psuł protobuf/tensorboard przed Treningiem.
 - Po numpy: ponownie tensorflow + utrwalenie `protobuf` 5.29+ (pip czasem zostawia 4.x po TF-cpu).
@@ -162,6 +163,12 @@ def main() -> None:
         py,
         "tensorflow-decision-forests",
         label="Colab: tensorflow-decision-forests (wymaga tensorflow==2.19 — nieużywane z TF-cpu)",
+    )
+
+    _pip(
+        py,
+        ["lightning-utilities>=0.12.0"],
+        label="lightning-utilities>=0.12 (importlib.metadata — bez pkg_resources / Py 3.12)",
     )
 
     _install_requirements_lines(py, train_req, label_prefix="Trening")
