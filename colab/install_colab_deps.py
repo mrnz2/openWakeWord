@@ -10,6 +10,7 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - Po PyTorch: odinstalowanie `tensorflow` z Colab (2.19), żeby nie psuł protobuf/tensorboard przed Treningiem.
 - Po numpy: ponownie tensorflow + utrwalenie `protobuf` 5.29+ (pip czasem zostawia 4.x po TF-cpu).
 - Usuwane `dopamine-rl` (Colab): w metadanych wymaga `tensorflow`, którego nie trzymamy (jest `tensorflow-cpu`).
+- Usuwane `tensorflow-decision-forests` (Colab): wymaga `tensorflow==2.19.0` — konflikt z `tensorflow-cpu` 2.18.
 """
 from __future__ import annotations
 
@@ -157,6 +158,11 @@ def main() -> None:
         "dopamine-rl",
         label="Colab: dopamine-rl (wymaga pakietu tensorflow — niekompatybilne z tensorflow-cpu)",
     )
+    _pip_try_uninstall(
+        py,
+        "tensorflow-decision-forests",
+        label="Colab: tensorflow-decision-forests (wymaga tensorflow==2.19 — nieużywane z TF-cpu)",
+    )
 
     _install_requirements_lines(py, train_req, label_prefix="Trening")
 
@@ -178,6 +184,11 @@ def main() -> None:
         py,
         "dopamine-rl",
         label="Colab: dopamine-rl po całości (fałszywy brak tensorflow przy protobuf)",
+    )
+    _pip_try_uninstall(
+        py,
+        "tensorflow-decision-forests",
+        label="Colab: tensorflow-decision-forests po całości (ostrzeżenie pip przy numpy)",
     )
     _pip(
         py,

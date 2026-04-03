@@ -10,6 +10,7 @@ Przykład:
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import re
 import runpy
@@ -35,33 +36,59 @@ def _usr_local_dist_packages() -> Path | None:
 
 def _fix_pkg_resources_for_colab() -> None:
     """
-    Debian/Colab: w /usr/lib/python3/dist-packages jest stary pkg_resources (ImpImporter usunięty w 3.12).
-    PYTHONPATH nie zawsze wygrywa z kolejnością site — usuwamy ten katalog z sys.path i cache importów.
+    Colab/Debian: stary pkg_resources w /usr/lib/.../dist-packages psuje się na 3.12 (ImpImporter).
+    Nie usuwamy całego site (wtedy znika pkg_resources, jeśli pip go nie wystawił). Przenosimy debian
+    na koniec sys.path, stawiamy /usr/local na początku, ewentualnie doinstalowujemy setuptools.
     """
     for key in list(sys.modules):
         if key == "pkg_resources" or key.startswith("pkg_resources."):
             del sys.modules[key]
-    drop: list[str] = []
+
+    lp = _usr_local_dist_packages()
+    lp_s = str(lp) if lp else None
+
+    debian: list[str] = []
+    middle: list[str] = []
     for p in sys.path:
-        if not p:
+        if p == "":
+            middle.append(p)
             continue
-        if p == "/usr/lib/python3/dist-packages":
-            drop.append(p)
-        elif (
+        if lp_s and p == lp_s:
+            continue
+        norm = p.replace("\\", "/")
+        is_debian = p == "/usr/lib/python3/dist-packages" or (
             p.startswith("/usr/lib/python3.")
             and p.endswith("/dist-packages")
-            and "/local/" not in p.replace("\\", "/")
-        ):
-            drop.append(p)
-    for p in drop:
-        while p in sys.path:
-            sys.path.remove(p)
-    local = _usr_local_dist_packages()
-    if local:
-        lp = str(local)
-        while lp in sys.path:
-            sys.path.remove(lp)
-        sys.path.insert(0, lp)
+            and "/local/" not in norm
+        )
+        if is_debian:
+            if p not in debian:
+                debian.append(p)
+        else:
+            middle.append(p)
+
+    sys.path[:] = ([lp_s] if lp_s else []) + middle + debian
+
+    if importlib.util.find_spec("pkg_resources") is None:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", "setuptools>=69.2.0"],
+            check=True,
+        )
+
+    try:
+        import pkg_resources  # noqa: F401
+    except (AttributeError, ModuleNotFoundError):
+        for p in debian:
+            while p in sys.path:
+                sys.path.remove(p)
+        for key in list(sys.modules):
+            if key == "pkg_resources" or key.startswith("pkg_resources."):
+                del sys.modules[key]
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", "setuptools>=69.2.0"],
+            check=True,
+        )
+        import pkg_resources  # noqa: F401
 
 
 PIPER_MODEL_URL = (
@@ -264,12 +291,20 @@ def run_openwakeword_train(
     display_cmd = [sys.executable, "-m", "openwakeword.train", *argv_rest]
     print(f"\n$ {' '.join(display_cmd)}\n", flush=True)
 
-    # Subprocess + PYTHONPATH nadal ładuje pkg_resources z /usr/lib (Python 3.12 / ImpImporter).
+    # pkg_resources musi być z /usr/local (setuptools) przed katalogiem openWakeWord.
     _fix_pkg_resources_for_colab()
     oww = str(OWW_ROOT.resolve())
+    _lp = _usr_local_dist_packages()
+    lp_s = str(_lp) if _lp else None
     while oww in sys.path:
         sys.path.remove(oww)
-    sys.path.insert(0, oww)
+    if lp_s:
+        while lp_s in sys.path:
+            sys.path.remove(lp_s)
+        sys.path.insert(0, oww)
+        sys.path.insert(0, lp_s)
+    else:
+        sys.path.insert(0, oww)
 
     run_argv = [str(train_py), *argv_rest]
     old_argv = sys.argv[:]
