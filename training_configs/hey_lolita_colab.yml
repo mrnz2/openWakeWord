@@ -14,9 +14,10 @@ custom_negative_phrases:
  - "hey leader"
 
 # Colab free: często ~12 GB RAM — trzymaj niskie batche; pełny profil = hey_lolita.yml + Colab Pro.
+# tts_batch_size >= 7: w upstream train.py adversarial negatives używają batch_size=tts_batch_size//7 (6//7=0 → brak .wav).
 n_samples: 8000
 n_samples_val: 1200
-tts_batch_size: 6
+tts_batch_size: 7
 augmentation_batch_size: 4
 augmentation_rounds: 2
 
