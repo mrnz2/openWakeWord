@@ -28,6 +28,7 @@ Docelowa fraza treningowa: **"hey lolita"**
 - Skrypt `colab/colab_train.py` klonuje `openWakeWord` v0.6.0, stosuje ten sam patch co Dockerfile i uruchamia konwersję TFLite lokalnie (`onnx2tf` z pip).
 - Profil `training_configs/hey_lolita_colab.yml` jest lżejszy (mniej próbek/kroków) pod limity czasu i RAM w Colab; pełna jakość: skopiuj parametry z `hey_lolita.yml`.
 - Jeśli `colab_train.py` kończy się **exit 2**: zaktualizuj plik `colab/colab_train.py` z repozytorium (poprzednio `yaml.dump` potrafił psuć config dla `openwakeword.train`; jest też wymuszany `PYTHONPATH` na klon w `/content/openwakeword_v060`). Po zmianach w Colab usuń stary klon: `!rm -rf /content/openwakeword_v060` i uruchom ponownie.
+- **Exit 1 w Colab:** często **`!pip` vs `sys.executable`** — pakiety trafiają do innego Pythona niż kernel (np. log pokazuje `/usr/bin/python3` bez `torch`). Notebook używa `python -m pip` dla tego samego interpretera; komórka treningu **wczytuje `colab_train.py` w tym samym procesie co kernel** (bez `subprocess`), żeby uniknąć rozjazdu interpreterów. Zaktualizuj notebook z repo i uruchom komórki od początku po **Runtime → Restart runtime**.
 
 ## Wymagania
 

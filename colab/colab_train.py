@@ -184,7 +184,10 @@ def run_openwakeword_train(
         cmd.extend(["--generate_clips", "--augment_clips"])
     oww = str(OWW_ROOT.resolve())
     prev = os.environ.get("PYTHONPATH", "")
-    train_env = {"PYTHONPATH": oww + (os.pathsep + prev if prev else "")}
+    train_env = {
+        "PYTHONPATH": oww + (os.pathsep + prev if prev else ""),
+        "PYTHONUNBUFFERED": "1",
+    }
     run(cmd, cwd=OWW_ROOT, env=train_env)
 
 
@@ -325,4 +328,18 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except subprocess.CalledProcessError as exc:
+        print(
+            f"\n[colab_train] Subprocess zakończony kodem {exc.returncode}.\n"
+            f"Polecenie: {exc.cmd!r}\n"
+            "Szczegóły powinny być w logu POWYŻEJ (stdout/stderr tego polecenia).\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        sys.exit(1)
