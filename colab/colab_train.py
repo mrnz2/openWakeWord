@@ -17,6 +17,10 @@ import sys
 import urllib.request
 from pathlib import Path
 
+
+class CommandFailed(RuntimeError):
+    """Polecenie podrzędne zwróciło kod != 0; komunikat zawiera koniec jego stdout/stderr."""
+
 OWW_ROOT = Path("/content/openwakeword_v060")
 PIPER_MODEL_URL = (
     "https://github.com/rhasspy/piper-sample-generator/releases/download/v1.0.0/"
@@ -29,10 +33,39 @@ def run(
     *,
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
+    tail_max_chars: int = 48000,
 ) -> None:
     print(f"\n$ {' '.join(cmd)}\n")
     full_env = {**os.environ, **env} if env else None
-    subprocess.run(cmd, check=True, cwd=str(cwd) if cwd else None, env=full_env)
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        env=full_env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    chunks: list[str] = []
+    total = 0
+    assert proc.stdout is not None
+    try:
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            chunks.append(line)
+            total += len(line)
+            while total > tail_max_chars and chunks:
+                total -= len(chunks.pop(0))
+    finally:
+        proc.stdout.close()
+    code = proc.wait()
+    if code != 0:
+        tail = "".join(chunks)
+        raise CommandFailed(
+            f"Polecenie zakończone kodem {code}:\n  {' '.join(cmd)}\n\n"
+            f"--- ostatnie ~{tail_max_chars} znaków wyjścia ---\n{tail[-tail_max_chars:]}"
+        )
 
 
 def ensure_validation_features(project_dir: Path) -> Path:
@@ -73,6 +106,10 @@ def is_openwakeword_patched(train_py: Path) -> bool:
 
 def ensure_openwakeword_env(project_dir: Path) -> None:
     train_py = OWW_ROOT / "openwakeword" / "train.py"
+    patch_script = project_dir / "scripts" / "patch_openwakeword_train.py"
+    if not patch_script.exists():
+        raise FileNotFoundError(f"Brak patcha: {patch_script}")
+
     if OWW_ROOT.exists() and train_py.exists() and is_openwakeword_patched(train_py):
         print(f"openWakeWord już przygotowany: {OWW_ROOT}")
     else:
@@ -109,10 +146,8 @@ def ensure_openwakeword_env(project_dir: Path) -> None:
             print(f"Pobieranie modelu Piper -> {piper_pt}")
             urllib.request.urlretrieve(PIPER_MODEL_URL, str(piper_pt))
 
-        patch_script = project_dir / "scripts" / "patch_openwakeword_train.py"
-        if not patch_script.exists():
-            raise FileNotFoundError(f"Brak patcha: {patch_script}")
-        run([sys.executable, str(patch_script), str(train_py)])
+    # Idempotentny patch (TFLite + strażnik pustego positive_test) — także dla starego klonu w /content.
+    run([sys.executable, str(patch_script), str(train_py)])
 
     # Embeddingi openWakeWord — wywołanie jest idempotentne (jak w Dockerfile).
     download_snippet = (
@@ -330,13 +365,8 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except subprocess.CalledProcessError as exc:
-        print(
-            f"\n[colab_train] Subprocess zakończony kodem {exc.returncode}.\n"
-            f"Polecenie: {exc.cmd!r}\n"
-            "Szczegóły powinny być w logu POWYŻEJ (stdout/stderr tego polecenia).\n",
-            file=sys.stderr,
-        )
+    except CommandFailed as exc:
+        print(f"\n[colab_train] {exc}", file=sys.stderr)
         sys.exit(1)
     except Exception:
         import traceback

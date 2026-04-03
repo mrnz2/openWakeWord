@@ -3,7 +3,8 @@
 #
 # torch + torchaudio instaluje colab/install_colab_deps.py (osobno, z indeksem CUDA lub PyPI).
 
-numpy==1.26.4
+# TF 2.18 (tensorflow-cpu<2.19): numpy<2.1,>=1.26 — na Colab lepiej 2.0.x (mniej konfliktów z jax/opencv niż 1.26).
+numpy>=2.0.0,<2.1.0
 scipy>=1.3,<2
 tqdm>=4,<5
 requests>=2,<3

@@ -120,8 +120,18 @@ def main() -> None:
 
     _install_requirements_lines(py, tflite_req, label_prefix="TFLite")
 
-    _pip(py, ["--force-reinstall", "numpy==1.26.4"], label="Ponownie numpy==1.26.4 (po TF)")
+    # Po TF: utrwal numpy 2.0.x (wymóg TF 2.18: <2.1; Colab ma pakiety wymagające numpy>=2).
+    _pip(
+        py,
+        ["--force-reinstall", "numpy>=2.0.0,<2.1.0"],
+        label="Ponownie numpy 2.0.x (po tensorflow-cpu, zgodność z Colab)",
+    )
 
+    print(
+        "\n[INFO] Pip może nadal zgłaszać konflikty z pakietami Colab (np. protobuf, tensorboard), "
+        "których ten notebook nie używa — trening openWakeWord opiera się na torch + tensorflow-cpu z requirements.\n",
+        flush=True,
+    )
     print("\nGotowe. Interpreter:", py, flush=True)
     print("Test: import torch; print(torch.__version__, torch.cuda.is_available())", flush=True)
 
