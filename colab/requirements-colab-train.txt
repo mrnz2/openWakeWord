@@ -10,7 +10,8 @@ tqdm>=4,<5
 requests>=2,<3
 pyyaml>=6,<7
 scikit-learn>=1,<2
-protobuf>=3.20,<5
+# TF 2.18: protobuf<6,>=3.20; Colab (grpcio-status, ydf, …) wymaga ~5.29+ — unikamy downgrade do 4.x.
+protobuf>=5.29.1,<6
 
 onnx>=1.14,<1.17
 onnxruntime>=1.16,<2

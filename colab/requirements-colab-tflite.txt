@@ -1,4 +1,4 @@
-# tensorflow-cpu najpierw — onnx2tf przy instalacji nie ściąga wtedy pełnego tensorflow z GPU.
-# Import w Pythonie: import tensorflow as tf
+# install_colab_deps przed tym odinstalowuje pakiet `tensorflow` z obrazu Colab (2.19), żeby nie kłócił się z TF-cpu 2.18.
+# Import: import tensorflow as tf
 tensorflow-cpu>=2.16.0,<2.19
 onnx2tf==1.26.3

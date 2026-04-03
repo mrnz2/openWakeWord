@@ -5,7 +5,10 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - Nie instaluje `openwakeword` z PyPI (klon v0.6.0 jest w colab_train.py).
 - Każda linia z requirements = osobne `pip install` — widać winnego pakietu.
 - Przy błędzie: RuntimeError z ETAP + końcówka stderr/stdout pip (w tracebacku na dole komórki).
-- setuptools>=69: naprawa pkg_resources na Pythonie 3.12 (Colab: stary moduł z /usr/lib + torchmetrics).
+- setuptools>=69: pkg_resources + Python 3.12 (torchmetrics).
+- jedi>=0.16: razem z pip/wheel — ipython w Colab bez jedi = ostrzeżenie po setuptools.
+- Po PyTorch: odinstalowanie `tensorflow` z Colab (2.19), żeby nie psuł protobuf/tensorboard przed Treningiem.
+- Po numpy: ponownie tensorflow + utrwalenie `protobuf` 5.29+ (pip czasem zostawia 4.x po TF-cpu).
 """
 from __future__ import annotations
 
@@ -73,6 +76,20 @@ def _install_one_requirement(py: str, line: str, *, label: str) -> None:
     _pip(py, [line], label=label)
 
 
+def _pip_try_uninstall(py: str, package: str, *, label: str) -> None:
+    """pip uninstall -y (brak pakietu = OK)."""
+    print("\n" + "=" * 72, flush=True)
+    print(f"ETAP: {label}", flush=True)
+    cmd = [py, "-m", "pip", "uninstall", "-y", package]
+    print("$ " + " ".join(cmd), flush=True)
+    print("=" * 72 + "\n", flush=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.stdout:
+        print(r.stdout, end="", flush=True)
+    if r.stderr:
+        print(r.stderr, end="", file=sys.stderr, flush=True)
+
+
 def _install_requirements_lines(py: str, req_path: Path, *, label_prefix: str) -> None:
     text = req_path.read_text(encoding="utf-8")
     n = 0
@@ -96,7 +113,12 @@ def main() -> None:
     if not tflite_req.is_file():
         raise RuntimeError(f"Brak pliku: {tflite_req}")
 
-    _pip(py, ["-U", "pip", "wheel"], label="Narzędzia pip")
+    # jedi w tej samej transakcji co pip — inaczej łatwo pominąć osobny ETAP przy starym sklonowanym repo.
+    _pip(
+        py,
+        ["-U", "pip", "wheel", "jedi>=0.16"],
+        label="Narzędzia pip + jedi (ipython w Colab)",
+    )
     # Debian/Colab: /usr/lib/.../pkg_resources odwołuje się do pkgutil.ImpImporter (usunięty w 3.12).
     _pip(
         py,
@@ -123,6 +145,13 @@ def main() -> None:
         print("\n[INFO] cu124 nie zadziałał — instaluję torch+torchaudio z PyPI.\n", flush=True)
         _pip(py, ["torch", "torchaudio"], label="PyTorch (fallback PyPI)")
 
+    # Zanim Trening ustawi protobuf — usuwamy pełny TF 2.19 z obrazu (kłóci się z TF-cpu 2.18 i tensorboard).
+    _pip_try_uninstall(
+        py,
+        "tensorflow",
+        label="Colab: odinstalowanie tensorflow (przed Trening — protobuf / tensorboard)",
+    )
+
     _install_requirements_lines(py, train_req, label_prefix="Trening")
 
     _install_requirements_lines(py, tflite_req, label_prefix="TFLite")
@@ -134,9 +163,20 @@ def main() -> None:
         label="Ponownie numpy 2.0.x (po tensorflow-cpu, zgodność z Colab)",
     )
 
+    _pip_try_uninstall(
+        py,
+        "tensorflow",
+        label="Colab: tensorflow po całości (gdyby wrócił z metadanych innego pakietu)",
+    )
+    _pip(
+        py,
+        ["--upgrade", "--force-reinstall", "protobuf>=5.29.1,<6"],
+        label="protobuf 5.29+ (utrwalenie — ydf/grain vs stary 4.x po pip)",
+    )
+
     print(
-        "\n[INFO] Pip może nadal zgłaszać konflikty z pakietami Colab (np. protobuf, tensorboard), "
-        "których ten notebook nie używa — trening openWakeWord opiera się na torch + tensorflow-cpu z requirements.\n",
+        "\n[INFO] Pojedyncze „dependency conflicts” mogą dotyczyć paczek Colab poza tym notebookiem; "
+        "sukces = „Successfully installed …” i brak kodu błędu pip.\n",
         flush=True,
     )
     print("\nGotowe. Interpreter:", py, flush=True)
