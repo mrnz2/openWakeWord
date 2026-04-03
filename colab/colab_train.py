@@ -22,6 +22,15 @@ class CommandFailed(RuntimeError):
     """Polecenie podrzędne zwróciło kod != 0; komunikat zawiera koniec jego stdout/stderr."""
 
 OWW_ROOT = Path("/content/openwakeword_v060")
+
+
+def _usr_local_dist_packages() -> Path | None:
+    """Katalog site-packages pip na Linux/Colab — musi być przed /usr/lib w PYTHONPATH (pkg_resources 3.12)."""
+    v = f"{sys.version_info.major}.{sys.version_info.minor}"
+    p = Path(f"/usr/local/lib/python{v}/dist-packages")
+    return p if p.is_dir() else None
+
+
 PIPER_MODEL_URL = (
     "https://github.com/rhasspy/piper-sample-generator/releases/download/v1.0.0/"
     "en-us-libritts-high.pt"
@@ -219,8 +228,11 @@ def run_openwakeword_train(
         cmd.extend(["--generate_clips", "--augment_clips"])
     oww = str(OWW_ROOT.resolve())
     prev = os.environ.get("PYTHONPATH", "")
+    # Colab/Debian: bez tego `import pkg_resources` bierze zepsuty pakiet z /usr/lib (ImpImporter).
+    local_site = _usr_local_dist_packages()
+    path_parts = ([str(local_site)] if local_site else []) + [oww] + ([prev] if prev else [])
     train_env = {
-        "PYTHONPATH": oww + (os.pathsep + prev if prev else ""),
+        "PYTHONPATH": os.pathsep.join(path_parts),
         "PYTHONUNBUFFERED": "1",
     }
     run(cmd, cwd=OWW_ROOT, env=train_env)

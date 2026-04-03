@@ -5,6 +5,7 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - Nie instaluje `openwakeword` z PyPI (klon v0.6.0 jest w colab_train.py).
 - Każda linia z requirements = osobne `pip install` — widać winnego pakietu.
 - Przy błędzie: RuntimeError z ETAP + końcówka stderr/stdout pip (w tracebacku na dole komórki).
+- setuptools>=69: naprawa pkg_resources na Pythonie 3.12 (Colab: stary moduł z /usr/lib + torchmetrics).
 """
 from __future__ import annotations
 
@@ -95,7 +96,13 @@ def main() -> None:
     if not tflite_req.is_file():
         raise RuntimeError(f"Brak pliku: {tflite_req}")
 
-    _pip(py, ["-U", "pip", "setuptools", "wheel"], label="Narzędzia pip")
+    _pip(py, ["-U", "pip", "wheel"], label="Narzędzia pip")
+    # Debian/Colab: /usr/lib/.../pkg_resources odwołuje się do pkgutil.ImpImporter (usunięty w 3.12).
+    _pip(
+        py,
+        ["--force-reinstall", "setuptools>=69.2.0"],
+        label="setuptools>=69 (pkg_resources + Python 3.12; torchmetrics)",
+    )
 
     torch_cmd = [
         py,
