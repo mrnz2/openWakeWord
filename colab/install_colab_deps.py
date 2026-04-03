@@ -5,7 +5,6 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - Nie instaluje `openwakeword` z PyPI (klon v0.6.0 jest w colab_train.py).
 - Każda linia z requirements = osobne `pip install` — widać winnego pakietu.
 - Przy błędzie: RuntimeError z ETAP + końcówka stderr/stdout pip (w tracebacku na dole komórki).
-- Linux + Python 3.12: piper-phonemize z GitHub @v1.1.0 (PyPI: brak wheel manylinux cp312).
 """
 from __future__ import annotations
 
@@ -69,18 +68,6 @@ def _install_one_requirement(py: str, line: str, *, label: str) -> None:
             f"webrtcvad: PyPI i GitHub nie powiodły się.\n"
             f"ETAP: {label}\n\nOstatni stderr:\n{last_err}"
         )
-
-    # PyPI ma piper-phonemize 1.1.0 z cp312 tylko dla macOS; na Linux + Python 3.12 brak wheela.
-    if line.strip().startswith("piper-phonemize"):
-        if sys.version_info >= (3, 12) and sys.platform.startswith("linux"):
-            _pip(
-                py,
-                ["git+https://github.com/rhasspy/piper-phonemize.git@v1.1.0"],
-                label=f"{label} (Linux+3.12: build ze źródeł v1.1.0 — w apt musi być cmake)",
-            )
-            return
-        _pip(py, [line], label=label)
-        return
 
     _pip(py, [line], label=label)
 

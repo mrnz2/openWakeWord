@@ -25,5 +25,4 @@ pronouncing>=0.2,<1
 julius
 webrtcvad
 espeak-phonemizer
-# 1.1.0 z PyPI: na Linux+CPython 3.12 brak wheela (jest cp312-macosx). install_colab_deps → git@v1.1.0.
-piper-phonemize==1.1.0
+# piper-sample-generator używa espeak_phonemizer, nie piper_phonemize — pakiet rhasspy/piper-phonemize nie jest wymagany.

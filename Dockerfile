@@ -38,8 +38,7 @@ RUN pip install --no-cache-dir \
     "pronouncing>=0.2,<1" \
     "julius" \
     "webrtcvad" \
-    "espeak-phonemizer" \
-    "piper-phonemize==1.1.0"
+    "espeak-phonemizer"
 
 # STEP 5: Main package
 RUN pip install --no-cache-dir "openwakeword==0.6.0"
