@@ -2,6 +2,7 @@
 Uruchomienie treningu openWakeWord na Google Colab bez Dockera.
 
 Wymaga: Linux, git, zależności z colab/install_colab_deps.py (train + tflite), pakietów apt (espeak-ng).
+Trening openWakeWord uruchamiany jest w tym samym procesie (fix sys.path / pkg_resources na Pythonie 3.12 w Colab).
 
 Przykład:
   python colab/colab_train.py --project_root /content/WakeWordProject
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -29,6 +31,37 @@ def _usr_local_dist_packages() -> Path | None:
     v = f"{sys.version_info.major}.{sys.version_info.minor}"
     p = Path(f"/usr/local/lib/python{v}/dist-packages")
     return p if p.is_dir() else None
+
+
+def _fix_pkg_resources_for_colab() -> None:
+    """
+    Debian/Colab: w /usr/lib/python3/dist-packages jest stary pkg_resources (ImpImporter usunięty w 3.12).
+    PYTHONPATH nie zawsze wygrywa z kolejnością site — usuwamy ten katalog z sys.path i cache importów.
+    """
+    for key in list(sys.modules):
+        if key == "pkg_resources" or key.startswith("pkg_resources."):
+            del sys.modules[key]
+    drop: list[str] = []
+    for p in sys.path:
+        if not p:
+            continue
+        if p == "/usr/lib/python3/dist-packages":
+            drop.append(p)
+        elif (
+            p.startswith("/usr/lib/python3.")
+            and p.endswith("/dist-packages")
+            and "/local/" not in p.replace("\\", "/")
+        ):
+            drop.append(p)
+    for p in drop:
+        while p in sys.path:
+            sys.path.remove(p)
+    local = _usr_local_dist_packages()
+    if local:
+        lp = str(local)
+        while lp in sys.path:
+            sys.path.remove(lp)
+        sys.path.insert(0, lp)
 
 
 PIPER_MODEL_URL = (
@@ -214,28 +247,47 @@ def run_openwakeword_train(
     train_only: bool,
     force_overwrite: bool,
 ) -> None:
-    cmd = [
-        sys.executable,
-        "-m",
-        "openwakeword.train",
+    train_py = OWW_ROOT / "openwakeword" / "train.py"
+    if not train_py.is_file():
+        raise FileNotFoundError(f"Brak {train_py} — uruchom setup (ensure_openwakeword_env).")
+
+    argv_rest = [
         "--training_config",
         str(config_in_container),
         "--train_model",
     ]
     if force_overwrite:
-        cmd.append("--overwrite")
+        argv_rest.append("--overwrite")
     if not train_only:
-        cmd.extend(["--generate_clips", "--augment_clips"])
+        argv_rest.extend(["--generate_clips", "--augment_clips"])
+
+    display_cmd = [sys.executable, "-m", "openwakeword.train", *argv_rest]
+    print(f"\n$ {' '.join(display_cmd)}\n", flush=True)
+
+    # Subprocess + PYTHONPATH nadal ładuje pkg_resources z /usr/lib (Python 3.12 / ImpImporter).
+    _fix_pkg_resources_for_colab()
     oww = str(OWW_ROOT.resolve())
-    prev = os.environ.get("PYTHONPATH", "")
-    # Colab/Debian: bez tego `import pkg_resources` bierze zepsuty pakiet z /usr/lib (ImpImporter).
-    local_site = _usr_local_dist_packages()
-    path_parts = ([str(local_site)] if local_site else []) + [oww] + ([prev] if prev else [])
-    train_env = {
-        "PYTHONPATH": os.pathsep.join(path_parts),
-        "PYTHONUNBUFFERED": "1",
-    }
-    run(cmd, cwd=OWW_ROOT, env=train_env)
+    while oww in sys.path:
+        sys.path.remove(oww)
+    sys.path.insert(0, oww)
+
+    run_argv = [str(train_py), *argv_rest]
+    old_argv = sys.argv[:]
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(OWW_ROOT)
+        sys.argv = run_argv
+        runpy.run_path(str(train_py), run_name="__main__")
+    except SystemExit as e:
+        code = e.code
+        if code not in (0, None):
+            raise CommandFailed(
+                f"openwakeword.train zakończył się kodem {code!r}.\n"
+                f"Polecenie (odpowiednik): {' '.join(display_cmd)}"
+            ) from e
+    finally:
+        sys.argv = old_argv
+        os.chdir(old_cwd)
 
 
 def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) -> None:

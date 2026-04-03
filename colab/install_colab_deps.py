@@ -9,6 +9,7 @@ Instalacja zależności pod Google Colab w bezpiecznej kolejności.
 - jedi>=0.16: razem z pip/wheel — ipython w Colab bez jedi = ostrzeżenie po setuptools.
 - Po PyTorch: odinstalowanie `tensorflow` z Colab (2.19), żeby nie psuł protobuf/tensorboard przed Treningiem.
 - Po numpy: ponownie tensorflow + utrwalenie `protobuf` 5.29+ (pip czasem zostawia 4.x po TF-cpu).
+- Usuwane `dopamine-rl` (Colab): w metadanych wymaga `tensorflow`, którego nie trzymamy (jest `tensorflow-cpu`).
 """
 from __future__ import annotations
 
@@ -151,6 +152,11 @@ def main() -> None:
         "tensorflow",
         label="Colab: odinstalowanie tensorflow (przed Trening — protobuf / tensorboard)",
     )
+    _pip_try_uninstall(
+        py,
+        "dopamine-rl",
+        label="Colab: dopamine-rl (wymaga pakietu tensorflow — niekompatybilne z tensorflow-cpu)",
+    )
 
     _install_requirements_lines(py, train_req, label_prefix="Trening")
 
@@ -167,6 +173,11 @@ def main() -> None:
         py,
         "tensorflow",
         label="Colab: tensorflow po całości (gdyby wrócił z metadanych innego pakietu)",
+    )
+    _pip_try_uninstall(
+        py,
+        "dopamine-rl",
+        label="Colab: dopamine-rl po całości (fałszywy brak tensorflow przy protobuf)",
     )
     _pip(
         py,
