@@ -1,6 +1,7 @@
 import argparse
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -39,6 +40,29 @@ def read_model_name(config_path: Path) -> str:
     return match.group(1).strip()
 
 
+def reset_workspace(project_dir: Path) -> None:
+    """Remove outputs*, downloaded validation features, and Docker build context junk."""
+    removed = []
+    for p in sorted(project_dir.glob("outputs*")):
+        if p.is_dir():
+            shutil.rmtree(p)
+            removed.append(str(p))
+    assets = project_dir / "assets"
+    if assets.is_dir():
+        shutil.rmtree(assets)
+        removed.append(str(assets))
+    if removed:
+        print("Removed:")
+        for line in removed:
+            print(f"  {line}")
+    else:
+        print("Nothing to remove (no outputs*/assets).")
+    print(
+        "Docker image wakeword-trainer:latest was not removed. "
+        "To reclaim space: docker rmi wakeword-trainer:latest"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -68,8 +92,13 @@ def main():
     )
     parser.add_argument(
         "--shm_size",
-        default="8g",
-        help="Docker shared memory size (passed as --shm-size), e.g. 2g or 8g.",
+        default="4g",
+        help="Docker shared memory (--shm-size). On 16 GB RAM laptops 4g is safer; use 8g if stable.",
+    )
+    parser.add_argument(
+        "--reset_workspace",
+        action="store_true",
+        help="Delete outputs* and assets/ then exit (fresh start; re-downloads validation on next run).",
     )
     parser.add_argument(
         "--train_only",
@@ -97,6 +126,10 @@ def main():
     args = parser.parse_args()
 
     project_dir = Path(__file__).resolve().parent
+    if args.reset_workspace:
+        reset_workspace(project_dir)
+        return
+
     output_dir = (project_dir / args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     ensure_validation_features(project_dir)
@@ -147,39 +180,104 @@ def main():
     print("\nTraining finished.")
 
     if not args.skip_tflite_conversion:
-        onnx_path = "/workdir/" + f"{model_name}.onnx"
-        tflite_workdir = "/workdir/" + f"onnx2tf_{model_name}"
-        tflite_export = tflite_workdir + "/" + f"{model_name}_float32.tflite"
+        # 1) Last Gemm -> MatMul+Add (avoids onnx2tf ONNX_GEMM custom op in Wyoming).
+        onnx_for_tflite = f"{model_name}_for_tflite.onnx"
+        onnx_tfconv = f"{model_name}_tfconv.onnx"
+        sm_tfconv_dir = f"onnx2tf_{model_name}_tfconv"
+        wrapped_sm = f"wrapped_{model_name}_sm"
         final_tflite = str((output_dir / f"{model_name}.tflite").resolve())
-        convert_cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--entrypoint",
-            "onnx2tf",
-            "-v",
-            f"{output_dir}:/workdir",
-            "pinto0309/onnx2tf:latest",
-            "-i",
-            onnx_path,
-            "-o",
-            tflite_workdir,
-        ]
-        run(convert_cmd)
+
         run(
             [
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
                 "python",
-                "-c",
-                (
-                    "from pathlib import Path; import shutil; "
-                    f"src=Path(r'{tflite_export}'); "
-                    f"dst=Path(r'{final_tflite}'); "
-                    "assert src.exists(), f'Missing converted file: {src}'; "
-                    "shutil.copyfile(src, dst); "
-                    "print(f'Saved TFLite model: {dst}')"
-                ),
+                "-v",
+                f"{project_dir}:/workspace/project",
+                "-v",
+                f"{output_dir}:/workspace/outputs",
+                args.image,
+                "/workspace/project/scripts/rewrite_last_gemm_to_matmul.py",
+                f"/workspace/outputs/{model_name}.onnx",
+                f"/workspace/outputs/{onnx_for_tflite}",
             ]
         )
+        # 2) Flatten -> Reshape so onnx2tf tf_converter infers [1,1536] correctly.
+        run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "python",
+                "-v",
+                f"{project_dir}:/workspace/project",
+                "-v",
+                f"{output_dir}:/workspace/outputs",
+                args.image,
+                "/workspace/project/scripts/replace_flatten_with_reshape.py",
+                f"/workspace/outputs/{onnx_for_tflite}",
+                f"/workspace/outputs/{onnx_tfconv}",
+            ]
+        )
+        # 3) ONNX -> SavedModel via tf_converter (writable copy avoids onnxsim permission errors).
+        onnx2tf_shell = (
+            f"cp /workdir/{onnx_tfconv} /tmp/in.onnx && "
+            f"onnx2tf -i /tmp/in.onnx -o /workdir/{sm_tfconv_dir} -tb tf_converter"
+        )
+        run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "bash",
+                "-v",
+                f"{output_dir}:/workdir",
+                "pinto0309/onnx2tf:latest",
+                "-c",
+                onnx2tf_shell,
+            ]
+        )
+        # 4) Wrap: pyopen_wakeword feeds [1, N, 96]; inner SavedModel expects [1, 96, N].
+        run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "python",
+                "-v",
+                f"{project_dir}:/workspace/project",
+                "-v",
+                f"{output_dir}:/workspace/outputs",
+                args.image,
+                "/workspace/project/scripts/wrap_saved_model_wake_input.py",
+                f"/workspace/outputs/{sm_tfconv_dir}",
+                f"/workspace/outputs/{wrapped_sm}",
+            ]
+        )
+        # 5) Final float32 TFLite for Wyoming / Home Assistant.
+        run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "python",
+                "-v",
+                f"{project_dir}:/workspace/project",
+                "-v",
+                f"{output_dir}:/workspace/outputs",
+                args.image,
+                "/workspace/project/scripts/export_saved_model_to_tflite.py",
+                f"/workspace/outputs/{wrapped_sm}",
+                f"/workspace/outputs/{model_name}.tflite",
+            ]
+        )
+        print(f"\nSaved TFLite model: {final_tflite}")
 
     print("Check your model files in the output directory.")
 

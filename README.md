@@ -62,7 +62,10 @@ Domyślnie w:
   Używa innego katalogu wynikowego.
 
 - `python train.py --shm_size 8g`  
-  Ustawia pamięć współdzieloną Dockera (ważne przy błędach typu bus error / 137).
+  Większa pamięć współdzielona Dockera (domyślnie `4g` — bezpieczniej na laptopach z 16 GB RAM).
+
+- `python train.py --reset_workspace`  
+  Usuwa wszystkie `outputs*` oraz `assets/` (w tym pobrane cechy walidacyjne) i kończy — czysty start przed kolejnym `python train.py`.
 
 - `python train.py --force_overwrite`  
   Wymusza nadpisanie plików pośrednich (pełny świeży przebieg).
@@ -74,23 +77,32 @@ Domyślnie w:
 
 Plik: `training_configs/hey_lolita.yml`
 
-Aktualny profil jest ustawiony na stabilność (mniejsza szansa przerwania):
+Profil **najlepszej jakości** (nadal sensowny na ~16 GB RAM): więcej próbek, 2 rundy augmentacji, dłuższy trening.
 
-- `n_samples: 12000`
-- `n_samples_val: 2000`
-- `augmentation_rounds: 1`
-- `steps: 16000`
-- `batch_n_per_class: 24/24`
+- `n_samples: 22000`, `n_samples_val: 3500`
+- `tts_batch_size: 18`, `augmentation_batch_size: 6`, `augmentation_rounds: 2`
+- `batch_n_per_class: 14/14`, `steps: 64000` (z gotowymi `*_features_*.npy` możesz podnieść `steps` i użyć `--train_only`)
 
-Jeśli masz dużo RAM i chcesz lepszą jakość, możesz stopniowo zwiększać `steps`.
+W **Docker Desktop** ustaw limit pamięci kontenerów ok. **10–12 GB** (zostaw margines dla Windows). **RTX 4050**: obecny `Dockerfile` trenuje na **CPU** w kontenerze Linux; GPU wymagałoby osobnego obrazu z CUDA (nie jest w tym projekcie).
+
+`.dockerignore` zawęża kontekst buildu (szybszy `docker build`, mniejszy transfer do demona).
 
 ## Rozwiązywanie problemów
 
 - **Exit code 137**  
-  Zwykle brak pamięci. Zwiększ RAM w Docker Desktop i uruchom z `--shm_size 8g`.
+  Zwykle brak pamięci. Zwiększ RAM w Docker Desktop, zmniejsz batche w YAML lub uruchom z `--shm_size 8g` (jeśli masz zapas RAM poza Dockerem).
 
 - **Bus error / shared memory**  
   Uruchamiaj z `--shm_size 8g` (lub więcej).
+
+- **`ONNX_GEMM` / nierozwiązany custom op w TFLite (Wyoming)**  
+  Stary pipeline `onnx2tf` potrafił wstawić operator `ONNX_GEMM`, którego wbudowany interpreter TFLite w dodatku Wyoming nie obsługuje.  
+  `train.py` przepuszcza ONNX przez `scripts/rewrite_last_gemm_to_matmul.py` (ostatnia warstwa `Gemm` → `MatMul` + `Add`).
+
+- **Brak reakcji na słowo mimo niskiego progu (np. 0,1)**  
+  `pyopen_wakeword` (Wyoming) podaje do modelu bufor o kształcie **`[1, 16, 96]`** (16 okien × 96 wymiarów embeddingu).  
+  Surowy eksport `onnx2tf` często deklaruje wejście jako **`[1, 96, 16]`** — ten sam blok pamięci jest wtedy **źle interpretowany**, wyniki są bezsensowne i próg nigdy nie przechodzi.  
+  Bieżący `train.py` po `onnx2tf` (ścieżka `tf_converter`) owija SavedModel skryptem `scripts/wrap_saved_model_wake_input.py`, tak aby plik `.tflite` miał wejście **`[1, 16, 96]`** i zgadzał się numerycznie z ONNX.
 
 - **Błędy połączenia w Home Assistant (Wyoming)**  
   Sprawdź, czy addon/serwis wake word działa i czy host/port są poprawne.

@@ -12,11 +12,14 @@ custom_negative_phrases:
  - "hey luna"
  - "hey leader"
 
-n_samples: 12000
-n_samples_val: 2000
-tts_batch_size: 12
-augmentation_batch_size: 6
-augmentation_rounds: 1
+# Profil „najlepsza jakość”: więcej danych, więcej augmentacji, dłuższy trening (dłużej / więcej RAM).
+# tts_batch_size: przy ~16 GB RAM i Dockerze 18 potrafi dać exit 137 w okolicach batch ~700+ (OOM Piper/Torch).
+# Przy 137: zejdź do 8; przy stabilnym Dockerze 12+ możesz próbować podnieść.
+n_samples: 22000
+n_samples_val: 3500
+tts_batch_size: 8
+augmentation_batch_size: 4
+augmentation_rounds: 2
 
 piper_sample_generator_path: "./piper-sample-generator"
 output_dir: "/workspace/outputs"
@@ -35,12 +38,13 @@ false_positive_validation_data_path: "/workspace/project/assets/validation_set_f
 feature_data_files: {}
 
 batch_n_per_class:
- "adversarial_negative": 24
- "positive": 24
+ "adversarial_negative": 14
+ "positive": 14
 
 model_type: "dnn"
 layer_size: 32
 
-steps: 16000
+# Po pierwszym pełnym przebiegu możesz podnieść steps i użyć --train_only (bez ponownego TTS).
+steps: 64000
 max_negative_weight: 1800
 target_false_positives_per_hour: 0.1

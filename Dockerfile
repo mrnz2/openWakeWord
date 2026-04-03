@@ -51,6 +51,7 @@ RUN git clone --branch v0.6.0 --depth 1 https://github.com/dscripka/openWakeWord
 RUN git clone https://github.com/dscripka/piper-sample-generator.git ./piper-sample-generator
 RUN python -c "import urllib.request; urllib.request.urlretrieve('https://github.com/rhasspy/piper-sample-generator/releases/download/v1.0.0/en-us-libritts-high.pt','/app/piper-sample-generator/models/en-us-libritts-high.pt')"
 RUN python -c "import os; os.makedirs('/app/openwakeword/resources/models', exist_ok=True); import openwakeword.utils as u; u.download_models(target_directory='/app/openwakeword/resources/models')"
-RUN python -c "from pathlib import Path; import re; p=Path('/app/openwakeword/train.py'); s=p.read_text(); s=re.sub(r'convert_onnx_to_tflite\\([\\s\\S]*?config\\[\"model_name\"\\] \\+ \"\\\\.tflite\"\\)\\)', 'print(\"Skipping ONNX->TFLite conversion (onnx-tf compatibility issue). ONNX model was exported successfully.\")', s, count=1); p.write_text(s)"
+COPY scripts/patch_openwakeword_train.py /tmp/patch_openwakeword_train.py
+RUN python /tmp/patch_openwakeword_train.py /app/openwakeword/train.py
 
 ENTRYPOINT ["python", "-m", "openwakeword.train"]

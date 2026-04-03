@@ -1,0 +1,12 @@
+# Smaller/faster docker build context (outputs & data stay on host via -v mounts)
+.git
+**/__pycache__
+**/.venv
+**/venv
+outputs*
+assets
+*.md
+.pytest_cache
+.mypy_cache
+.idea
+.vscode
