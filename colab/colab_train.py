@@ -161,6 +161,13 @@ def ensure_openwakeword_env(project_dir: Path) -> None:
     # Idempotentny patch (TFLite + strażnik pustego positive_test) — także dla starego klonu w /content.
     run([sys.executable, str(patch_script), str(train_py)])
 
+    piper_gs = OWW_ROOT / "piper-sample-generator" / "generate_samples.py"
+    patch_piper = project_dir / "scripts" / "patch_piper_generate_samples.py"
+    if piper_gs.is_file():
+        if not patch_piper.is_file():
+            raise FileNotFoundError(f"Brak patcha Piper: {patch_piper}")
+        run([sys.executable, str(patch_piper), str(piper_gs)])
+
     # Embeddingi openWakeWord — wywołanie jest idempotentne (jak w Dockerfile).
     download_snippet = (
         "import os; "
