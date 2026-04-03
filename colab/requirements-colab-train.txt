@@ -16,6 +16,8 @@ scikit-learn>=1,<2
 protobuf>=5.29.1,<6
 
 onnx>=1.14,<1.17
+# PyTorch 2.4+ (Colab): torch.onnx.export → onnxscript — bez tego export_model w openWakeWord kończy się ModuleNotFoundError.
+onnxscript>=0.2.0,<1
 onnxruntime>=1.16,<2
 
 torchinfo>=1.8,<2
