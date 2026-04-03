@@ -21,6 +21,14 @@ Docelowa fraza treningowa: **"hey lolita"**
 - `scripts/convert_to_tflite.py` - pomocniczy skrypt konwersji (używany w pipeline).
 - `outputs_.../` - katalog wyników (tworzony automatycznie).
 
+## Google Colab (bez Dockera)
+
+- W repozytorium: notebook `colab/WakeWordProject_Colab.ipynb` — wgraj go do Colab (**File → Upload notebook**) albo otwórz z GitHuba.
+- Ustaw `REPO_URL` w notebooku (fork z tym projektem) albo wgraj ZIP do `/content/WakeWordProject` i `USE_GIT_CLONE = False`.
+- Skrypt `colab/colab_train.py` klonuje `openWakeWord` v0.6.0, stosuje ten sam patch co Dockerfile i uruchamia konwersję TFLite lokalnie (`onnx2tf` z pip).
+- Profil `training_configs/hey_lolita_colab.yml` jest lżejszy (mniej próbek/kroków) pod limity czasu i RAM w Colab; pełna jakość: skopiuj parametry z `hey_lolita.yml`.
+- Jeśli `colab_train.py` kończy się **exit 2**: zaktualizuj plik `colab/colab_train.py` z repozytorium (poprzednio `yaml.dump` potrafił psuć config dla `openwakeword.train`; jest też wymuszany `PYTHONPATH` na klon w `/content/openwakeword_v060`). Po zmianach w Colab usuń stary klon: `!rm -rf /content/openwakeword_v060` i uruchom ponownie.
+
 ## Wymagania
 
 - Windows + PowerShell

@@ -1,0 +1,48 @@
+## Profil pod Google Colab: mniejsze n_samples/steps żeby zmieścić się w limicie czasu / RAM.
+## Ścieżki output_dir i false_positive_* nadpisuje colab/colab_train.py — możesz edytować batche.
+
+model_name: "hey_lolita"
+
+target_phrase:
+ - "hey lolita"
+
+custom_negative_phrases:
+ - "hey lolitto"
+ - "hey lola"
+ - "hey lollipop"
+ - "hey luna"
+ - "hey leader"
+
+# Colab free: często ~12 GB RAM — trzymaj niskie batche; pełny profil = hey_lolita.yml + Colab Pro.
+n_samples: 8000
+n_samples_val: 1200
+tts_batch_size: 6
+augmentation_batch_size: 4
+augmentation_rounds: 2
+
+piper_sample_generator_path: "./piper-sample-generator"
+output_dir: "/content/wakeword_outputs"
+
+rir_paths:
+ []
+
+background_paths:
+ []
+
+background_paths_duplication_rate:
+ []
+
+false_positive_validation_data_path: "/content/WakeWordProject/assets/validation_set_features.npy"
+
+feature_data_files: {}
+
+batch_n_per_class:
+ "adversarial_negative": 8
+ "positive": 8
+
+model_type: "dnn"
+layer_size: 32
+
+steps: 24000
+max_negative_weight: 1800
+target_false_positives_per_hour: 0.1
