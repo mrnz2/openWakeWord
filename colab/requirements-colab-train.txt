@@ -15,7 +15,8 @@ scikit-learn>=1,<2
 # TF 2.18: protobuf<6,>=3.20; Colab (grpcio-status, ydf, …) wymaga ~5.29+ — unikamy downgrade do 4.x.
 protobuf>=5.29.1,<6
 
-onnx>=1.14,<1.17
+# onnx-graphsurgeon 0.5.x importuje onnx.helper.float32_to_bfloat16 — w praktyce potrzebny onnx >= ~1.17 (Colab: unikaj <1.17).
+onnx>=1.18.0,<1.21
 # PyTorch 2.4+ (Colab): torch.onnx.export → onnxscript — bez tego export_model w openWakeWord kończy się ModuleNotFoundError.
 onnxscript>=0.2.0,<1
 onnxruntime>=1.16,<2

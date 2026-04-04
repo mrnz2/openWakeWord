@@ -262,6 +262,14 @@ def run_openwakeword_train(
 
 
 def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) -> None:
+    # Stary onnx z dist-packages (Colab) bez float32_to_bfloat16 — onnx_graphsurgeon się wywala przy imporcie.
+    _pd = str(project_dir.resolve())
+    if _pd not in sys.path:
+        sys.path.insert(0, _pd)
+    from colab.onnx_helper_shim import apply_onnx_helper_bfloat16_shim
+
+    apply_onnx_helper_bfloat16_shim()
+
     scripts = project_dir / "scripts"
     onnx_path = output_dir / f"{model_name}.onnx"
     if not onnx_path.exists():
@@ -294,12 +302,14 @@ def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) ->
     shutil.copy(onnx_tfconv, tmp_in)
     if sm_tfconv_dir.exists():
         shutil.rmtree(sm_tfconv_dir)
-    onnx2tf_bin = shutil.which("onnx2tf")
-    if not onnx2tf_bin:
-        raise RuntimeError("Brak polecenia onnx2tf w PATH (zainstaluj colab/requirements-colab.txt).")
+    # Nigdy /usr/local/bin/onnx2tf — bez shima onnx_graphsurgeon pada na starym onnx.helper.
+    onnx2tf_shim = scripts / "run_onnx2tf_with_shim.py"
+    if not onnx2tf_shim.is_file():
+        raise FileNotFoundError(f"Brak {onnx2tf_shim} — zaktualizuj repozytorium WakeWordProject na Colab (git pull).")
     run(
         [
-            onnx2tf_bin,
+            sys.executable,
+            str(onnx2tf_shim),
             "-i",
             str(tmp_in),
             "-o",

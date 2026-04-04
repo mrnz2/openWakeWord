@@ -1,4 +1,8 @@
 # install_colab_deps przed tym odinstalowuje pakiet `tensorflow` z obrazu Colab (2.19), żeby nie kłócił się z TF-cpu 2.18.
 # Import: import tensorflow as tf
 tensorflow-cpu>=2.16.0,<2.19
+# Ta sama dolna granica co w requirements-colab-train.txt — graphsurgeon 0.5.x wymaga helper.float32_to_bfloat16.
+onnx>=1.18.0,<1.21
+# onnx2tf ładuje `onnx_graphsurgeon` — pakiet PyPI nazywa się onnx-graphsurgeon (bez tego: ModuleNotFoundError).
+onnx-graphsurgeon>=0.5.2,<1
 onnx2tf==1.26.3

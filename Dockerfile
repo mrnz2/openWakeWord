@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir \
     "onnxruntime>=1.10.0,<2" \
     "onnx==1.14.0" \
     "onnx-tf==1.10.0" \
+    "onnx-graphsurgeon>=0.5.2,<1" \
     "onnx2tf==1.26.3"
 
 # STEP 4: Audio/training stack
