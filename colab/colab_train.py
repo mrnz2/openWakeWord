@@ -104,13 +104,16 @@ def ensure_validation_features(project_dir: Path) -> Path:
     out_file = assets_dir / "validation_set_features.npy"
 
     if TEST_MODE:
-        # Omijamy pobieranie ~185 MB — tworzymy minimalny plik-zaślepkę (1-feature array).
+        # Omijamy pobieranie ~185 MB — tworzymy zaślepkę z wystarczającą liczbą wierszy.
+        # train.py tworzy okna przesuwne o szerokości input_shape[0] ≈ 16 (klipy 2 s),
+        # więc plik musi mieć co najmniej input_shape[0]+1 wierszy, inaczej batch_size=0.
+        # 200 wierszy → 184 okien przy window=16; bezpieczny margines na dłuższe klipy.
         if not out_file.exists() or out_file.stat().st_size == 0:
             print(
-                f"[TEST_MODE=True] Tworzę dummy validation_set_features.npy -> {out_file}"
+                f"[TEST_MODE=True] Tworzę dummy validation_set_features.npy (200×96) -> {out_file}"
             )
             import numpy as np  # noqa: PLC0415  # numpy jest wymagane przez oww
-            dummy = np.zeros((1, 96), dtype=np.float32)
+            dummy = np.zeros((200, 96), dtype=np.float32)
             np.save(str(out_file), dummy)
         else:
             print(f"[TEST_MODE=True] Validation features (dummy/real) OK: {out_file}")
