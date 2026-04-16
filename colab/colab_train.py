@@ -211,10 +211,16 @@ def ensure_openwakeword_env(project_dir: Path) -> None:
     run([sys.executable, "-c", download_snippet], cwd=OWW_ROOT)
 
 
-def _replace_yaml_scalar_line(text: str, key: str, value_quoted: str, *, source: Path) -> str:
-    """Zamienia jedną linię `key: ...` bez yaml.dump (openWakeWord ładuje config wrażliwym Loaderem)."""
+def _replace_yaml_scalar_line(
+    text: str, key: str, value_quoted: str, *, source: Path, quoted: bool = True
+) -> str:
+    """Zamienia jedną linię `key: ...` bez yaml.dump (openWakeWord ładuje config wrażliwym Loaderem).
+
+    quoted=True  → wartość otoczona cudzysłowem (ścieżki, stringi).
+    quoted=False → wartość zapisana jako literał (liczby całkowite).
+    """
     pattern = re.compile(rf"(?m)^{re.escape(key)}:\s*.+$")
-    new_line = f'{key}: "{value_quoted}"'
+    new_line = f'{key}: "{value_quoted}"' if quoted else f"{key}: {value_quoted}"
     new_text, n = pattern.subn(new_line, text, count=1)
     if n != 1:
         raise RuntimeError(
@@ -224,9 +230,9 @@ def _replace_yaml_scalar_line(text: str, key: str, value_quoted: str, *, source:
 
 
 def _apply_test_mode_to_yaml(text: str, source: Path) -> str:
-    """Nadpisuje wybrane klucze skalarne w YAML wartościami ze _TEST_MODE_OVERRIDES."""
+    """Nadpisuje wybrane klucze skalarne w YAML wartościami ze _TEST_MODE_OVERRIDES (bez cudzysłowów — liczby)."""
     for key, value in _TEST_MODE_OVERRIDES.items():
-        text = _replace_yaml_scalar_line(text, key, value, source=source)
+        text = _replace_yaml_scalar_line(text, key, value, source=source, quoted=False)
     return text
 
 
