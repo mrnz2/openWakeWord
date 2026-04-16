@@ -5,4 +5,10 @@ tensorflow-cpu>=2.16.0,<2.19
 onnx>=1.18.0,<1.21
 # onnx2tf ładuje `onnx_graphsurgeon` — pakiet PyPI nazywa się onnx-graphsurgeon (bez tego: ModuleNotFoundError).
 onnx-graphsurgeon>=0.5.2,<1
+# onnx2tf jest instalowane z --no-deps (żeby nie nadpisał onnx/tensorflow); poniższe to jego transitive deps
+# pominięte przez --no-deps, a wymagane przy imporcie: sng4onnx (auto-naming ops), sne4onnx (node extractor),
+# simple_onnx_processing_tools (wspólna baza obu powyższych). Bez nich: ModuleNotFoundError: No module named 'sng4onnx'.
+sng4onnx>=1.0.4
+sne4onnx>=1.0.13
+simple_onnx_processing_tools
 onnx2tf==1.26.3
