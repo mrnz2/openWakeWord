@@ -371,8 +371,6 @@ def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) ->
             str(tmp_in),
             "-o",
             str(sm_tfconv_dir),
-            "-tb",
-            "tf_converter",
         ]
     )
 

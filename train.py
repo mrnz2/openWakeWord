@@ -225,7 +225,7 @@ def main():
         # 3) ONNX -> SavedModel via tf_converter (writable copy avoids onnxsim permission errors).
         onnx2tf_shell = (
             f"cp /workdir/{onnx_tfconv} /tmp/in.onnx && "
-            f"onnx2tf -i /tmp/in.onnx -o /workdir/{sm_tfconv_dir} -tb tf_converter"
+            f"onnx2tf -i /tmp/in.onnx -o /workdir/{sm_tfconv_dir}"
         )
         run(
             [

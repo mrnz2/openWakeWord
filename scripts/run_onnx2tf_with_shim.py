@@ -1,7 +1,7 @@
 """Uruchom onnx2tf z shimem onnx.helper.float32_to_bfloat16 (Colab / stary pakiet onnx).
 
-Wywołanie jak CLI onnx2tf, np.:
-  python scripts/run_onnx2tf_with_shim.py -i model.onnx -o out_dir -tb tf_converter
+Wywołanie jak CLI onnx2tf (onnx2tf>=1.26.3 nie ma -tb; SavedModel to domyślny output), np.:
+  python scripts/run_onnx2tf_with_shim.py -i model.onnx -o out_dir
 """
 from __future__ import annotations
 
