@@ -19,6 +19,24 @@ import sys
 import urllib.request
 from pathlib import Path
 
+# ── TEST MODE ────────────────────────────────────────────────────────────────
+# True  → szybki smoke-test (minimalne dane, 50 kroków, batch 2).
+# False → oryginalne ustawienia z pliku YAML (trening docelowy).
+TEST_MODE: bool = True
+
+# Wartości nadpisujące YAML gdy TEST_MODE=True. Nie zmieniaj tego słownika —
+# zamiast tego przełącz TEST_MODE powyżej.
+_TEST_MODE_OVERRIDES: dict[str, str] = {
+    "n_samples": "20",
+    "n_samples_val": "10",
+    "tts_batch_size": "7",         # minimum: train.py używa batch_size = tts_batch_size // 7
+    "augmentation_batch_size": "2",
+    "augmentation_rounds": "1",
+    "steps": "50",
+}
+_TEST_MODE_DATA_DIR: str = "./test_data_dummy"
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 class CommandFailed(RuntimeError):
     """Polecenie podrzędne zwróciło kod != 0; komunikat zawiera koniec jego stdout/stderr."""
@@ -84,6 +102,20 @@ def ensure_validation_features(project_dir: Path) -> Path:
     assets_dir = project_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
     out_file = assets_dir / "validation_set_features.npy"
+
+    if TEST_MODE:
+        # Omijamy pobieranie ~185 MB — tworzymy minimalny plik-zaślepkę (1-feature array).
+        if not out_file.exists() or out_file.stat().st_size == 0:
+            print(
+                f"[TEST_MODE=True] Tworzę dummy validation_set_features.npy -> {out_file}"
+            )
+            import numpy as np  # noqa: PLC0415  # numpy jest wymagane przez oww
+            dummy = np.zeros((1, 96), dtype=np.float32)
+            np.save(str(out_file), dummy)
+        else:
+            print(f"[TEST_MODE=True] Validation features (dummy/real) OK: {out_file}")
+        return out_file
+
     if out_file.exists() and out_file.stat().st_size > 0:
         print(f"Validation features OK: {out_file}")
         return out_file
@@ -191,6 +223,13 @@ def _replace_yaml_scalar_line(text: str, key: str, value_quoted: str, *, source:
     return new_text
 
 
+def _apply_test_mode_to_yaml(text: str, source: Path) -> str:
+    """Nadpisuje wybrane klucze skalarne w YAML wartościami ze _TEST_MODE_OVERRIDES."""
+    for key, value in _TEST_MODE_OVERRIDES.items():
+        text = _replace_yaml_scalar_line(text, key, value, source=source)
+    return text
+
+
 def write_runtime_config(
     project_dir: Path,
     training_config_rel: str,
@@ -212,6 +251,15 @@ def write_runtime_config(
         val_abs.as_posix(),
         source=src,
     )
+
+    if TEST_MODE:
+        print(
+            "\n[TEST_MODE=True] Nadpisuję parametry YAML smoke-testem:\n"
+            + "\n".join(f"  {k}: {v}" for k, v in _TEST_MODE_OVERRIDES.items())
+            + f"\n  data dir: {_TEST_MODE_DATA_DIR}\n"
+        )
+        text = _apply_test_mode_to_yaml(text, source=src)
+
     out = output_dir / "_colab_runtime_config.yml"
     output_dir.mkdir(parents=True, exist_ok=True)
     out.write_text(text, encoding="utf-8")
