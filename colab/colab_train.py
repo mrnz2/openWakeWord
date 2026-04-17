@@ -401,8 +401,8 @@ def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) ->
     print(f"\nZapisano TFLite: {final_tflite}")
 
 
-def upload_to_drive(output_dir: Path, model_name: str, drive_folder: str) -> None:
-    """Montuje Google Drive (jeśli nie zamontowany) i kopiuje artefakty do drive_folder."""
+def upload_to_drive(output_dir: Path, model_name: str) -> None:
+    """Montuje Google Drive (jeśli nie zamontowany) i kopiuje artefakty do katalogu głównego MyDrive."""
     try:
         from google.colab import drive  # noqa: PLC0415
     except ImportError:
@@ -416,8 +416,7 @@ def upload_to_drive(output_dir: Path, model_name: str, drive_folder: str) -> Non
         print("\n[Drive] Montowanie Google Drive…")
         drive.mount(str(mount_point))
 
-    dest = mount_point / "MyDrive" / drive_folder
-    dest.mkdir(parents=True, exist_ok=True)
+    dest = mount_point / "MyDrive"
 
     artifacts = [
         output_dir / f"{model_name}.tflite",
@@ -480,12 +479,9 @@ def main() -> None:
         help="Zakończ na ONNX (bez konwersji TFLite).",
     )
     parser.add_argument(
-        "--drive_folder",
-        default="",
-        help=(
-            "Folder na MyDrive, do którego kopiowane są artefakty po treningu "
-            "(np. WakeWord/hey_lolita). Puste = brak uploadu na Drive."
-        ),
+        "--upload_to_drive",
+        action="store_true",
+        help="Po treningu skopiuj artefakty (.tflite, .onnx, config) do katalogu głównego MyDrive.",
     )
     args = parser.parse_args()
 
@@ -514,8 +510,8 @@ def main() -> None:
     if not args.skip_tflite:
         run_tflite_pipeline(project_dir, args.output_dir.resolve(), model_name)
 
-    if args.drive_folder.strip():
-        upload_to_drive(args.output_dir.resolve(), model_name, args.drive_folder.strip())
+    if args.upload_to_drive:
+        upload_to_drive(args.output_dir.resolve(), model_name)
 
     print("\nGotowe. Pobierz pliki z output_dir (np. zip albo skopiuj na Drive).")
 
