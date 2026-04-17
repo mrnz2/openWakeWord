@@ -20,9 +20,17 @@ import urllib.request
 from pathlib import Path
 
 # ── TEST MODE ────────────────────────────────────────────────────────────────
-# True  → szybki smoke-test (minimalne dane, 50 kroków, batch 2).
-# False → oryginalne ustawienia z pliku YAML (trening docelowy).
-TEST_MODE: bool = True
+# Opcja A — edytuj plik (lokalnie / przez git):
+#   TEST_MODE: bool = True   # smoke-test
+#   TEST_MODE: bool = False  # trening docelowy
+#
+# Opcja B — ustaw zmienną środowiskową w komórce Colab (BEZ edycji pliku):
+#   import os; os.environ["OWW_TEST_MODE"] = "1"   # smoke-test
+#   import os; os.environ["OWW_TEST_MODE"] = "0"   # trening docelowy
+#
+# Zmienna środowiskowa OWW_TEST_MODE ma wyższy priorytet niż wartość poniżej.
+_env_test_mode = os.environ.get("OWW_TEST_MODE")
+TEST_MODE: bool = bool(int(_env_test_mode)) if _env_test_mode is not None else False
 
 # Wartości nadpisujące YAML gdy TEST_MODE=True. Nie zmieniaj tego słownika —
 # zamiast tego przełącz TEST_MODE powyżej.
@@ -393,6 +401,45 @@ def run_tflite_pipeline(project_dir: Path, output_dir: Path, model_name: str) ->
     print(f"\nZapisano TFLite: {final_tflite}")
 
 
+def upload_to_drive(output_dir: Path, model_name: str, drive_folder: str) -> None:
+    """Montuje Google Drive (jeśli nie zamontowany) i kopiuje artefakty do drive_folder."""
+    try:
+        from google.colab import drive  # noqa: PLC0415
+    except ImportError:
+        print(
+            "\n[Drive] google.colab niedostępne (nie jesteś na Colab?) — pomijam upload.\n"
+        )
+        return
+
+    mount_point = Path("/content/drive")
+    if not (mount_point / "MyDrive").exists():
+        print("\n[Drive] Montowanie Google Drive…")
+        drive.mount(str(mount_point))
+
+    dest = mount_point / "MyDrive" / drive_folder
+    dest.mkdir(parents=True, exist_ok=True)
+
+    artifacts = [
+        output_dir / f"{model_name}.tflite",
+        output_dir / f"{model_name}.onnx",
+        output_dir / "_colab_runtime_config.yml",
+    ]
+    copied = []
+    for src in artifacts:
+        if src.exists():
+            shutil.copy2(src, dest / src.name)
+            copied.append(src.name)
+        else:
+            print(f"[Drive] Pominięto (brak): {src.name}")
+
+    if copied:
+        print(f"\n[Drive] Skopiowano do {dest}:")
+        for name in copied:
+            print(f"  {name}")
+    else:
+        print("[Drive] Brak plików do skopiowania.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Trening openWakeWord na Colab (bez Dockera).")
     parser.add_argument(
@@ -432,6 +479,14 @@ def main() -> None:
         action="store_true",
         help="Zakończ na ONNX (bez konwersji TFLite).",
     )
+    parser.add_argument(
+        "--drive_folder",
+        default="",
+        help=(
+            "Folder na MyDrive, do którego kopiowane są artefakty po treningu "
+            "(np. WakeWord/hey_lolita). Puste = brak uploadu na Drive."
+        ),
+    )
     args = parser.parse_args()
 
     project_dir = args.project_root.resolve()
@@ -458,6 +513,9 @@ def main() -> None:
 
     if not args.skip_tflite:
         run_tflite_pipeline(project_dir, args.output_dir.resolve(), model_name)
+
+    if args.drive_folder.strip():
+        upload_to_drive(args.output_dir.resolve(), model_name, args.drive_folder.strip())
 
     print("\nGotowe. Pobierz pliki z output_dir (np. zip albo skopiuj na Drive).")
 
