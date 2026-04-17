@@ -26,9 +26,13 @@ def main() -> None:
     in_key = keys[0]
 
     class Wrapped(tf.Module):
-        def __init__(self, inner_fn, key: str):
+        def __init__(self, inner_module: tf.Module, key: str):
             super().__init__()
-            self._inner = inner_fn
+            # Store the entire loaded module (not just the ConcreteFunction) so that
+            # tf.saved_model.save can walk the trackable graph and find all tf.Variables
+            # captured by inner.signatures["serving_default"]. Without this, TF raises
+            # "Tried to export a function which references an 'untracked' resource".
+            self._inner_module = inner_module
             self._key = key
 
         @tf.function(
@@ -36,9 +40,9 @@ def main() -> None:
         )
         def serving_default(self, wake_input: tf.Tensor) -> tf.Tensor:
             x = tf.transpose(wake_input, [0, 2, 1])
-            return self._inner(**{self._key: x})
+            return self._inner_module.signatures["serving_default"](**{self._key: x})
 
-    wrapped = Wrapped(fn, in_key)
+    wrapped = Wrapped(inner, in_key)
     if args.output_saved_model_dir.exists():
         shutil.rmtree(args.output_saved_model_dir)
     tf.saved_model.save(
